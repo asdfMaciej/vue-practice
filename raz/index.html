@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="../vue.js"></script>
+<script src="../axios.min.js"></script>
+<style>
+* {
+	margin: 0;
+	padding: 0;
+	box-sizing: border-box;
+}
+
+#body {
+	display: flex;
+	flex-direction: row;
+}
+#sidebar {
+	flex: 0 0 200px;
+}
+#content {
+	flex: 1 1;
+}
+</style>
+<title>vue</title>
+<meta charset="utf-8">
+</head>
+<body>
+<div id="app">
+	<div v-if="!loggedIn">
+		<login-modal @login="login($event)"></login-modal>
+	</div>
+
+	<div id="body" v-else>
+		<sidebar :user="user" @logout="logout" @section="useSection($event)"></sidebar>
+		<div id="content">
+			<div id="section-posts" v-if="section == 'posts'">
+				<h1><a href="#" @click.prevent="retrievePosts()">Pobierz z API</a></h1>
+				<h2><a href="#" @click.prevent="startAdding()">Dodaj post</a></h2>
+				<post v-for="post in posts" :post="post"></post>
+			</div>
+
+			<div id="section-post" v-if="section == 'post'">
+				<h2>Zawartość postu:</h2>
+				<a href="#" @click.prevent="useSection('posts')">Cofnij</a><br>
+				<a href="#" @click.prevent="useSection('edit-post')">Edytuj</a><br>
+				{{posts[activeId].content}}
+			</div>
+
+			<div id="section-main" v-if="section == 'main'">
+				test siema zalogowano {{user.login}}
+			</div>
+
+			<div id="section-edit-post" v-if="section == 'edit-post'">
+				<post-form :post="posts[activeId]" @submit="finishEditing($event)"></post-form>
+			</div>
+
+			<div id="section-add-post" v-if="section == 'add-post'">
+				<post-form :post="addedPost" @submit="finishAdding($event)"></post-form>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script type="text/x-template" id="login-template">
+	<div>
+		<h2>Zaloguj się:</h2>
+		<form @submit.prevent="onLogin">
+			<input type="text" v-model="login" placeholder="login"><br>
+			<input type="text" v-model="password" placeholder="password"><br>
+			<input type="submit">
+		</form>
+	</div>
+</script>
+
+<script type="text/x-template" id="sidebar-template">
+	<div id="sidebar">
+		Witaj <b>{{user.login}}</b>!<br>
+		<button @click="logout">Wyloguj się</button><br>
+		<hr><br>
+
+		<a href="#" @click.prevent="section('posts')">Przejdź do postów</a><br>
+		<a href="#" @click.prevent="section('main')">Przejdź do głównej</a>
+	</div>
+</script>
+
+<script type="text/x-template" id="post-template">
+	<div class="post">
+		<a href="#" @click.prevent="open(post)"><h3>Post #{{post.id}}</h3></a>
+		<i>Data: {{post.date}}</i><br>
+		<b>Tytuł: {{post.title}}</b><br>
+	</div>
+</script>
+
+<script type="text/x-template" id="post-form">
+<div>
+	<a href="#" @click.prevent="submit()">Zakończ</a><br>
+	<input type="text" v-model="post.title"><br>
+	<input type="text" v-model="post.date"><br>
+	<input type="text" v-model="post.content">
+</div>
+</script>
+
+<script>
+
+Vue.component("post-form", {
+	data: function() { return {
+		
+	}},
+
+	template: "#post-form",
+	props: {
+		post: {
+			title: "",
+			date: "",
+			content: ""
+		}
+	},
+
+	methods: {
+		submit() {
+			this.$emit('submit', this.post);
+		},
+
+		clear() {
+			this.post = {
+				title: "",
+				date: "",
+				content: ""
+			};
+		}
+	}
+});
+
+
+Vue.component("login-modal", {
+	data: function () { return {
+		"login": "",
+		"password": ""
+	} },
+	template: "#login-template",
+	methods: {
+		onLogin() {
+			let login = this.login;
+			let password = this.password;
+
+			if (!login || !password) {
+				alert("Uzupełnij formularz!");
+				return;
+			}
+
+			let data = {
+				login: login,
+				password: password
+			};
+
+			this.$emit('login', data);
+		}
+	}
+});
+
+Vue.component("sidebar", {
+	template: "#sidebar-template",
+	props: ['user'],
+	methods: {
+		logout() {
+			this.$emit('logout');
+		},
+		section(s) {
+			this.$emit('section', s);
+		}
+	}
+});
+
+Vue.component("post", {
+	template: "#post-template",
+	props: ['post'],
+	methods: {
+		open(post) {
+			let a_id = this.$root.posts.indexOf(post);
+			this.$root.activeId = a_id;
+			this.$root.useSection('post');
+		}
+	}
+});
+
+
+var app = new Vue({
+	el: '#app',
+	data: {
+		section: 'posts',
+		sections: ['posts', 'post', 'edit-post', 'add-post', 'main'],
+		loggedIn: false,
+		user: {},
+		posts: [
+			{id: -1, title: "Tytuł", date: "2018-01-29", content: "dzisiaj benc"},
+			{id: 0, title: "Tytuł dwa", date:"2137", content: "memy na lesnej szescdziesiat osiem i trzy trzecie"}
+		],
+		activeId: 0,
+		idEnum: 1,
+		addedPost: {
+			title: "",
+			date: "",
+			content: ""
+		}
+	},
+	methods: {
+		login(data) {
+			this.loggedIn = true;
+			this.user = {
+				login: data.login
+			};
+			this.section = 'main';
+		},
+
+		logout() {
+			this.loggedIn = false;
+			this.user = {};
+		},
+
+		useSection(s) {
+			if (this.sections.includes(s)) {
+				console.log(s);
+				this.section = s;
+			}
+		},
+
+		addPost(title, date, content) {
+			if (!title || !date || !content) {
+				return false;
+			}
+			this.posts.push({
+				title: title,
+				date: date,
+				content: content,
+				id: this.idEnum
+			});
+			this.idEnum += 1;
+			return true;
+		},
+
+		clearPosts() {
+			this.posts.splice(0, this.posts.length);
+			this.idEnum = 1;
+		},
+
+		retrievePosts() {
+			this.clearPosts();
+
+			axios
+			.get('https://jsonplaceholder.typicode.com/posts')
+			.then(response => {
+				response.data.forEach(post => {
+					let title = post.title;
+					let date = post.userId;
+					let content = post.body;
+					this.addPost(title, date, content);
+				});
+			});
+		},
+
+		editPost(postId, changes) {
+			if (this.posts.length <= postId) {
+				return false; // out of bounds
+			}
+			let changeable = ['title', 'date', 'content'];
+			changeable.forEach(key => {
+				if (key in changes) {
+					this.$set(this.posts[postId], key, changes[key]);
+				}
+			});
+		},
+
+		finishEditing(post) {
+			this.editPost(this.activeId, post);
+			this.useSection('posts');
+		},
+
+		startAdding() {
+			this.useSection('add-post');
+		},
+
+		finishAdding(post) {
+			this.addPost(post.title, post.date, post.content);
+			this.addedPost = {title: "", date: "", content: ""};
+			this.useSection('posts');
+		}
+	},
+
+	mounted() {}
+
+
+
+});
+</script>
+</body>
+</html>
+
